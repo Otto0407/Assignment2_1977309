@@ -2,6 +2,15 @@
 framework/stats.py
 ------------------
 Streaming statistical functions. All functions work chunk-wise using only numpy.
+
+Numerical stability notes
+-------------------------
+- Welford's online algorithm is used for running mean/variance to avoid
+  catastrophic cancellation with large-magnitude or high-precision data.
+- NaN values in input chunks are ignored per-feature (nanmean / nanvar
+  semantics): a feature column becomes NaN only if ALL its values are NaN.
+- chunk_histogram with a zero-range column (all values equal) places every
+  sample in the centre bin to avoid undefined behaviour.
 """
 
 import numpy as np
@@ -28,8 +37,7 @@ def welford_update(count: int, mean: float, M2: float, new_value: float) -> tupl
 
     Returns
     -------
-    tuple
-        (count+1, new_mean, new_M2) where
+    tuple : (count+1, new_mean, new_M2)
         new_mean : float  – updated mean
         new_M2   : float  – updated sum of squared deviations
     """
@@ -47,7 +55,7 @@ def welford_update(count: int, mean: float, M2: float, new_value: float) -> tupl
 
 def chunk_mean(X: np.ndarray) -> np.ndarray:
     """
-    Compute per-feature mean over a chunk.
+    Compute per-feature mean over a chunk, ignoring NaN values.
 
     Parameters
     ----------
@@ -57,17 +65,17 @@ def chunk_mean(X: np.ndarray) -> np.ndarray:
     Returns
     -------
     np.ndarray, shape (d,)
-        Per-feature mean values.
+        Per-feature mean values. NaN if all values in a column are NaN.
     """
     X = np.asarray(X, dtype=float)
     if X.ndim == 1:
         X = X.reshape(-1, 1)
-    return np.mean(X, axis=0)
+    return np.nanmean(X, axis=0)
 
 
 def chunk_variance(X: np.ndarray, ddof: int = 0) -> np.ndarray:
     """
-    Compute per-feature variance over a chunk.
+    Compute per-feature variance over a chunk, ignoring NaN values.
 
     Parameters
     ----------
@@ -79,17 +87,18 @@ def chunk_variance(X: np.ndarray, ddof: int = 0) -> np.ndarray:
     Returns
     -------
     np.ndarray, shape (d,)
-        Per-feature variance values.
+        Per-feature variance values. NaN if a column has fewer valid
+        values than required by ddof.
     """
     X = np.asarray(X, dtype=float)
     if X.ndim == 1:
         X = X.reshape(-1, 1)
-    return np.var(X, axis=0, ddof=ddof)
+    return np.nanvar(X, axis=0, ddof=ddof)
 
 
 def chunk_quantile(X: np.ndarray, q: float) -> np.ndarray:
     """
-    Compute per-feature quantile over a chunk.
+    Compute per-feature quantile over a chunk, ignoring NaN values.
 
     Parameters
     ----------
@@ -108,7 +117,7 @@ def chunk_quantile(X: np.ndarray, q: float) -> np.ndarray:
     X = np.asarray(X, dtype=float)
     if X.ndim == 1:
         X = X.reshape(-1, 1)
-    return np.quantile(X, q, axis=0)
+    return np.nanquantile(X, q, axis=0)
 
 
 def chunk_histogram(
@@ -117,7 +126,11 @@ def chunk_histogram(
     range_: tuple = None,
 ) -> tuple:
     """
-    Compute per-feature histogram over a chunk.
+    Compute per-feature histogram over a chunk (NaN values are excluded).
+
+    When a feature column has zero range (all values identical) and no
+    explicit range_ is given, all samples are placed in a single bin
+    centred on that value.
 
     Parameters
     ----------
@@ -126,25 +139,34 @@ def chunk_histogram(
     bins : int, optional (default=10)
         Number of equal-width bins.
     range_ : tuple (min, max) or None
-        Range for the bins. If None, uses [X.min(), X.max()] per feature.
+        Shared range for all features. If None, each feature uses its own
+        [nanmin, nanmax]; zero-range columns are handled safely.
 
     Returns
     -------
     counts : np.ndarray, shape (d, bins)
-        Bin counts for each feature.
+        Bin counts for each feature (NaN-excluded).
     edges : np.ndarray, shape (d, bins+1)
         Bin edges for each feature.
     """
     X = np.asarray(X, dtype=float)
     if X.ndim == 1:
         X = X.reshape(-1, 1)
-    n, d = X.shape
+    _, d = X.shape
     counts_list = []
     edges_list = []
     for j in range(d):
         col = X[:, j]
-        hist_range = range_ if range_ is not None else (col.min(), col.max())
-        c, e = np.histogram(col, bins=bins, range=hist_range)
+        col_valid = col[~np.isnan(col)]
+        if range_ is not None:
+            hist_range = range_
+        else:
+            lo, hi = (np.nanmin(col), np.nanmax(col)) if len(col_valid) > 0 else (0.0, 1.0)
+            if lo == hi:
+                # Zero-range: create a symmetric bin around the constant value
+                lo, hi = lo - 0.5, hi + 0.5
+            hist_range = (lo, hi)
+        c, e = np.histogram(col_valid, bins=bins, range=hist_range)
         counts_list.append(c)
         edges_list.append(e)
     return np.array(counts_list), np.array(edges_list)
@@ -157,7 +179,10 @@ def chunk_histogram(
 class StreamStats:
     """
     Maintains running statistics over streaming chunks using Welford's
-    online algorithm.
+    online algorithm (vectorised over features).
+
+    NaN values in a chunk are skipped per-feature: each feature maintains
+    its own sample count so that a NaN in one feature does not affect others.
 
     Parameters
     ----------
@@ -171,13 +196,15 @@ class StreamStats:
 
     def reset(self) -> None:
         """Reset all running statistics to their initial state."""
-        self._count = 0
+        self._count = np.zeros(self.n_features, dtype=np.int64)  # per-feature count
         self._mean = np.zeros(self.n_features, dtype=float)
         self._M2 = np.zeros(self.n_features, dtype=float)
 
     def update(self, X_chunk: np.ndarray) -> None:
         """
         Update running statistics with a new chunk of data.
+
+        NaN values are ignored per-feature.
 
         Parameters
         ----------
@@ -191,17 +218,16 @@ class StreamStats:
             raise ValueError(
                 f"Expected {self.n_features} features, got {X_chunk.shape[1]}"
             )
-        for i in range(X_chunk.shape[0]):
-            for j in range(self.n_features):
-                self._count_j = getattr(self, '_counts', None)
-                # Per-feature update using vectorised Welford
-                pass
-            # Vectorised Welford step over all features at once
-            self._count += 1
-            delta = X_chunk[i] - self._mean
-            self._mean += delta / self._count
-            delta2 = X_chunk[i] - self._mean
-            self._M2 += delta * delta2
+        # Vectorised Welford update row-by-row; skip NaN per feature
+        for row in X_chunk:
+            valid = ~np.isnan(row)
+            if not np.any(valid):
+                continue
+            self._count[valid] += 1
+            delta = np.where(valid, row - self._mean, 0.0)
+            self._mean[valid] += delta[valid] / self._count[valid]
+            delta2 = np.where(valid, row - self._mean, 0.0)
+            self._M2[valid] += delta[valid] * delta2[valid]
 
     def mean(self) -> np.ndarray:
         """
@@ -210,22 +236,25 @@ class StreamStats:
         Returns
         -------
         np.ndarray, shape (n_features,)
-            Per-feature running mean.
+            Per-feature running mean. NaN for features with no valid data.
         """
-        return self._mean.copy()
+        result = self._mean.copy()
+        result[self._count == 0] = np.nan
+        return result
 
     def variance(self) -> np.ndarray:
         """
-        Return the current running population variance per feature.
+        Return the current running population variance per feature (ddof=0).
 
         Returns
         -------
         np.ndarray, shape (n_features,)
-            Per-feature population variance (ddof=0).
+            Per-feature population variance. 0.0 for features with < 2 samples.
         """
-        if self._count < 2:
-            return np.zeros(self.n_features, dtype=float)
-        return self._M2 / self._count
+        var = np.zeros(self.n_features, dtype=float)
+        enough = self._count >= 2
+        var[enough] = self._M2[enough] / self._count[enough]
+        return var
 
     def std(self) -> np.ndarray:
         """
@@ -234,6 +263,16 @@ class StreamStats:
         Returns
         -------
         np.ndarray, shape (n_features,)
-            Per-feature standard deviation.
         """
         return np.sqrt(self.variance())
+
+    @property
+    def n_samples_seen(self) -> np.ndarray:
+        """
+        Per-feature sample count (excludes NaN observations).
+
+        Returns
+        -------
+        np.ndarray, shape (n_features,), dtype int64
+        """
+        return self._count.copy()
