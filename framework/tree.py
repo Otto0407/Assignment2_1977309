@@ -197,6 +197,22 @@ class DecisionTreeClassifier:
         X = np.asarray(X, dtype=float)
         return np.array([self._predict_proba_sample(x, self.tree_) for x in X])
 
+    def score(self, X: np.ndarray, y: np.ndarray) -> float:
+        """
+        Compute accuracy on (X, y).
+
+        Parameters
+        ----------
+        X : np.ndarray, shape (n, d)
+        y : np.ndarray, shape (n,)
+
+        Returns
+        -------
+        float : accuracy in [0, 1]
+        """
+        y = np.asarray(y)
+        return float(np.mean(self.predict(X) == y))
+
     # ------------------------------------------------------------------
     # Private tree-building helpers
     # ------------------------------------------------------------------

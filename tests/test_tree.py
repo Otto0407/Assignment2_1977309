@@ -112,6 +112,20 @@ class TestDecisionTreeFitPredict(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             clf.predict_proba(np.ones((3, 2)))
 
+    def test_score(self):
+        X, y = _make_binary_data()
+        clf = DecisionTreeClassifier(max_depth=4, random_state=0).fit(X, y)
+        s = clf.score(X, y)
+        self.assertGreater(s, 0.8)
+        self.assertLessEqual(s, 1.0)
+
+    def test_score_matches_manual_accuracy(self):
+        X, y = _make_binary_data()
+        clf = DecisionTreeClassifier(max_depth=4, random_state=1).fit(X, y)
+        preds = clf.predict(X)
+        expected = float(np.mean(preds == y))
+        self.assertAlmostEqual(clf.score(X, y), expected, places=12)
+
 
 # ---------------------------------------------------------------------------
 # Depth / split constraints
