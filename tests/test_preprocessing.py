@@ -140,6 +140,29 @@ class TestStandardScaler(unittest.TestCase):
         sc.partial_fit(np.array([1.0, 2.0, 3.0]))  # 1-D treated as (3,1)
         self.assertIsNotNone(sc._mean)
 
+    def test_nan_in_chunk_does_not_corrupt_state(self):
+        """NaN in chunk col-1 must not poison subsequent valid chunks."""
+        sc = StandardScaler()
+        sc.partial_fit(np.array([[1.0, np.nan], [3.0, 4.0]]))   # col-1: only 4.0 valid
+        sc.partial_fit(np.array([[5.0, 6.0], [7.0, 8.0]]))       # col-1: 6.0, 8.0 valid
+        # col-0: mean([1,3,5,7]) = 4.0;  col-1: nanmean([4,6,8]) = 6.0
+        np.testing.assert_allclose(sc._mean[0], 4.0, atol=1e-10)
+        np.testing.assert_allclose(sc._mean[1], 6.0, atol=1e-10)
+        self.assertFalse(np.any(np.isnan(sc._mean)))
+
+    def test_nan_input_transform_output(self):
+        """transform on a row with NaN should propagate NaN for that feature only."""
+        sc = StandardScaler()
+        sc.partial_fit(np.array([[1.0, 2.0], [3.0, 4.0]]))
+        Xt = sc.transform(np.array([[np.nan, 3.0]]))
+        self.assertTrue(np.isnan(Xt[0, 0]))
+        self.assertFalse(np.isnan(Xt[0, 1]))
+
+    def test_fit_transform_returns_correct_shape(self):
+        X = np.random.default_rng(7).normal(size=(50, 3))
+        Xt = StandardScaler().fit_transform(X)
+        self.assertEqual(Xt.shape, X.shape)
+
 
 # ---------------------------------------------------------------------------
 # MinMaxScaler
@@ -196,6 +219,22 @@ class TestMinMaxScaler(unittest.TestCase):
     def test_inverse_before_fit_raises(self):
         with self.assertRaises(RuntimeError):
             MinMaxScaler().inverse_transform(np.ones((3, 2)))
+
+    def test_all_nan_column_then_valid(self):
+        """all-NaN column on first chunk must not cause NaN state after valid data arrives."""
+        sc = MinMaxScaler()
+        sc.partial_fit(np.array([[np.nan, 1.0], [np.nan, 2.0]]))   # col-0 all NaN
+        sc.partial_fit(np.array([[3.0, 1.5]]))                       # col-0 now has data
+        self.assertAlmostEqual(sc._data_min[0], 3.0)
+        self.assertAlmostEqual(sc._data_max[0], 3.0)
+        self.assertFalse(np.any(np.isnan(sc._data_min)))
+        self.assertFalse(np.any(np.isinf(sc._data_min)))
+
+    def test_fit_transform(self):
+        X = np.array([[0.0, 10.0], [5.0, 20.0], [10.0, 30.0]])
+        Xt = MinMaxScaler().fit_transform(X)
+        np.testing.assert_allclose(Xt.min(axis=0), [0.0, 0.0])
+        np.testing.assert_allclose(Xt.max(axis=0), [1.0, 1.0])
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +351,13 @@ class TestImputer(unittest.TestCase):
         self.assertAlmostEqual(Xt[1, 1], expected_col1)
         self.assertAlmostEqual(Xt[0, 1], 5.0)   # was not NaN
         self.assertAlmostEqual(Xt[1, 0], 1.0)   # was not NaN
+
+    def test_fit_transform(self):
+        X = np.array([[1.0, np.nan], [3.0, 4.0], [5.0, np.nan]])
+        imp = Imputer(strategy='mean')
+        Xt = imp.fit_transform(X)
+        self.assertFalse(np.any(np.isnan(Xt)))
+        self.assertEqual(Xt.shape, X.shape)
 
 
 # ---------------------------------------------------------------------------

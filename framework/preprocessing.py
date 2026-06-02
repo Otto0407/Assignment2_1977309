@@ -81,8 +81,10 @@ class StandardScaler:
     # --- internal state helpers ---
 
     def _var(self) -> np.ndarray:
-        """Population variance from current state."""
-        return self._M2 / self._count if self._count > 0 else np.ones_like(self._mean)
+        """Population variance from current state (per feature)."""
+        count = np.asarray(self._count, dtype=float)
+        safe = np.where(count > 0, count, 1.0)
+        return np.where(count > 0, self._M2 / safe, 0.0)
 
     def _std(self) -> np.ndarray:
         std = np.sqrt(self._var())
@@ -111,18 +113,37 @@ class StandardScaler:
             X = X.reshape(1, -1)
         n_b, d = X.shape
 
-        # Chunk statistics (vectorised)
-        mean_b = np.mean(X, axis=0)                    # (d,)
-        M2_b = np.sum((X - mean_b) ** 2, axis=0)       # (d,)
-
         if self._mean is None:
             self._mean = np.zeros(d, dtype=float)
             self._M2 = np.zeros(d, dtype=float)
 
-        self._count, self._mean, self._M2 = _chan_combine(
-            self._count, self._mean, self._M2,
-            n_b, mean_b, M2_b,
+        # Per-feature: ignore NaN rows so they don't corrupt running state
+        valid_mask = ~np.isnan(X)                        # (n_b, d)
+        n_b_valid = valid_mask.sum(axis=0).astype(float) # (d,)
+
+        # Chunk mean (nanmean per feature; 0 where all NaN)
+        X_safe = np.where(valid_mask, X, 0.0)
+        mean_b = np.where(
+            n_b_valid > 0,
+            X_safe.sum(axis=0) / np.where(n_b_valid > 0, n_b_valid, 1.0),
+            0.0,
         )
+
+        # Chunk M2 (deviations from chunk mean, NaN rows excluded)
+        diff = np.where(valid_mask, X - mean_b, 0.0)
+        M2_b = (diff ** 2).sum(axis=0)
+
+        # Chan combine only for features that have valid data this chunk
+        n_ab = self._count + n_b_valid
+        safe_n_ab = np.where(n_ab > 0, n_ab, 1.0)
+        delta = mean_b - self._mean
+        self._mean = np.where(
+            n_b_valid > 0,
+            (self._count * self._mean + n_b_valid * mean_b) / safe_n_ab,
+            self._mean,
+        )
+        self._M2 = self._M2 + M2_b + delta ** 2 * self._count * n_b_valid / safe_n_ab
+        self._count = n_ab
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -200,9 +221,19 @@ class MinMaxScaler:
         X = np.asarray(X, dtype=float)
         if X.ndim == 1:
             X = X.reshape(1, -1)
-        chunk_min = np.nanmin(X, axis=0)
-        chunk_max = np.nanmax(X, axis=0)
+        _, d = X.shape
+        # Per-feature: only update min/max for columns that have at least one valid value
+        valid_mask = ~np.isnan(X)                        # (n, d)
+        has_valid = valid_mask.any(axis=0)               # (d,) bool
+
+        # Suppress the "All-NaN slice" warning — all-NaN columns are guarded by has_valid
+        with np.errstate(all='ignore'):
+            chunk_min = np.where(has_valid, np.nanmin(X, axis=0), np.inf)
+            chunk_max = np.where(has_valid, np.nanmax(X, axis=0), -np.inf)
+
         if self._data_min is None:
+            # Columns that are all-NaN on first chunk start as ±inf;
+            # they will be overwritten once valid data arrives
             self._data_min = chunk_min.copy()
             self._data_max = chunk_max.copy()
         else:
@@ -229,6 +260,10 @@ class MinMaxScaler:
         scale = np.where(scale == 0, 1.0, scale)
         lo, hi = self.feature_range
         return (X - self._data_min) / scale * (hi - lo) + lo
+
+    def fit_transform(self, X: np.ndarray) -> np.ndarray:
+        """Fit on X then transform X. X : (n, d) -> (n, d)."""
+        return self.partial_fit(X).transform(X)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -340,6 +375,10 @@ class Imputer:
             self._statistics = np.full(d, self.fill_value, dtype=float)
 
         return self
+
+    def fit_transform(self, X: np.ndarray) -> np.ndarray:
+        """Fit on X then transform X. X : (n, d) -> (n, d)."""
+        return self.partial_fit(X).transform(X)
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
