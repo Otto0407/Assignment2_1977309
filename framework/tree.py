@@ -151,9 +151,15 @@ class DecisionTreeClassifier:
         else:
             self._X_acc = np.vstack([self._X_acc, X])
             self._y_acc = np.concatenate([self._y_acc, y])
+        # Determine classes before calling fit (fit would overwrite with np.unique)
         if classes is not None:
             self.classes_ = classes
-        return self.fit(self._X_acc, self._y_acc)
+        else:
+            self.classes_ = np.unique(self._y_acc)
+        # Temporarily bypass fit's class detection by calling _build directly
+        rng = np.random.default_rng(self.random_state)
+        self.tree_ = self._build(self._X_acc, self._y_acc, depth=0, rng=rng)
+        return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
