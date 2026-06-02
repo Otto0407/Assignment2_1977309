@@ -113,6 +113,11 @@ def plot_predictions_vs_ground_truth(
     """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
+    if len(y_true) != len(y_pred):
+        raise ValueError(
+            f"y_true and y_pred must have the same length, "
+            f"got {len(y_true)} and {len(y_pred)}."
+        )
     n = len(y_true)
     indices = np.arange(n)
 
@@ -155,6 +160,11 @@ def plot_confusion_matrix(
     n = cm.shape[0]
     if class_names is None:
         class_names = [str(i) for i in range(n)]
+    if len(class_names) != n:
+        raise ValueError(
+            f"class_names has {len(class_names)} entries but confusion matrix "
+            f"is {n}×{n}."
+        )
 
     fig, ax = plt.subplots(figsize=(max(4, n), max(3, n)))
     im = ax.imshow(cm, interpolation='nearest', cmap='Blues')
