@@ -70,7 +70,32 @@ class TestStandardScaler(unittest.TestCase):
 
 
 # ===========================================================================
-# 2. Preprocessing — Imputer
+# 2. Preprocessing — MinMaxScaler
+# ===========================================================================
+
+from framework.preprocessing import MinMaxScaler
+
+
+class TestMinMaxScaler(unittest.TestCase):
+
+    def test_range_0_1(self):
+        """Output values should lie in [0, 1] after scaling."""
+        rng = np.random.default_rng(0)
+        X = rng.normal(size=(100, 3))
+        Xt = MinMaxScaler().partial_fit(X).transform(X)
+        self.assertGreaterEqual(Xt.min(), 0.0)
+        self.assertLessEqual(Xt.max(), 1.0)
+
+    def test_inverse_roundtrip(self):
+        """inverse_transform(transform(X)) should recover X."""
+        rng = np.random.default_rng(1)
+        X = rng.normal(size=(50, 2))
+        sc = MinMaxScaler().partial_fit(X)
+        np.testing.assert_allclose(sc.inverse_transform(sc.transform(X)), X, atol=1e-10)
+
+
+# ===========================================================================
+# 3. Preprocessing — Imputer
 # ===========================================================================
 
 class TestImputer(unittest.TestCase):
@@ -288,6 +313,19 @@ class TestMetrics(unittest.TestCase):
         stream_cm.update(y_true[:30], y_pred[:30])
         stream_cm.update(y_true[30:], y_pred[30:])
         np.testing.assert_array_equal(stream_cm.result(), batch_cm)
+
+    def test_f1_zero_for_all_wrong(self):
+        """F1 should be 0 when every prediction is wrong."""
+        y_true = np.array([1, 1, 1, 1])
+        y_pred = np.array([0, 0, 0, 0])
+        self.assertEqual(f1_score(y_true, y_pred, average='macro'), 0.0)
+
+    def test_training_accuracy_entropy(self):
+        """Entropy criterion should also achieve >85 % training accuracy."""
+        X, y = _binary_data(n=500)
+        from framework.tree import DecisionTreeClassifier as DTC
+        clf = DTC(max_depth=5, criterion='entropy').fit(X, y)
+        self.assertGreater(np.mean(clf.predict(X) == y), 0.85)
 
 
 # ===========================================================================
