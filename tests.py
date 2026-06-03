@@ -1,8 +1,7 @@
 """
 tests.py
 --------
-40 unit tests covering standard functionality and streaming / edge-case
-behaviour across the whole framework.
+40 unit tests across the whole framework.
 
 Run with:
     pytest tests.py -v
@@ -22,17 +21,12 @@ from framework.metrics import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Shared fixtures
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 def binary_data():
     rng = np.random.default_rng(0)
     X = rng.normal(size=(200, 4))
     y = (X[:, 0] + X[:, 1] > 0).astype(int)
     return X, y
-
 
 @pytest.fixture
 def binary_data_large():
@@ -41,7 +35,6 @@ def binary_data_large():
     y = (X[:, 0] + X[:, 1] > 0).astype(int)
     return X, y
 
-
 @pytest.fixture
 def rf_pipeline():
     return Pipeline([
@@ -49,15 +42,10 @@ def rf_pipeline():
         ('clf', EnsembleClassifier(n_estimators=5, random_state=0)),
     ])
 
-
 @pytest.fixture
 def stream_trainer(rf_pipeline):
     return StreamTrainer(rf_pipeline, metrics=[Accuracy()], log_memory=True)
 
-
-# ===========================================================================
-# 1. StandardScaler
-# ===========================================================================
 
 class TestStandardScaler:
 
@@ -90,10 +78,6 @@ class TestStandardScaler:
         assert not np.any(np.isnan(Xt))
 
 
-# ===========================================================================
-# 2. MinMaxScaler
-# ===========================================================================
-
 class TestMinMaxScaler:
 
     def test_range_0_1(self):
@@ -109,10 +93,6 @@ class TestMinMaxScaler:
         sc = MinMaxScaler().partial_fit(X)
         np.testing.assert_allclose(sc.inverse_transform(sc.transform(X)), X, atol=1e-10)
 
-
-# ===========================================================================
-# 3. Imputer
-# ===========================================================================
 
 class TestImputer:
 
@@ -135,10 +115,6 @@ class TestImputer:
         with pytest.raises(ValueError):
             Imputer(strategy='mode').partial_fit(np.ones((5, 2)))
 
-
-# ===========================================================================
-# 4. DecisionTree
-# ===========================================================================
 
 class TestDecisionTree:
 
@@ -190,10 +166,6 @@ class TestDecisionTree:
         assert not np.any(np.isnan(preds.astype(float)))
 
 
-# ===========================================================================
-# 5. Ensemble
-# ===========================================================================
-
 class TestEnsemble:
 
     def test_predict_proba_sums_to_one(self, binary_data):
@@ -233,10 +205,6 @@ class TestEnsemble:
             EnsembleClassifier(method='boosting').fit(X[:50], y[:50])
 
 
-# ===========================================================================
-# 6. Pipeline
-# ===========================================================================
-
 class TestPipeline:
 
     def test_fit_predict_shape(self, binary_data):
@@ -273,10 +241,6 @@ class TestPipeline:
         preds = pipe.fit(X, y).predict(X)
         assert not np.any(np.isnan(preds.astype(float)))
 
-
-# ===========================================================================
-# 7. Metrics
-# ===========================================================================
 
 class TestMetrics:
 
@@ -331,10 +295,6 @@ class TestMetrics:
         assert roc_auc_score(y, scores) == pytest.approx(0.0)
 
 
-# ===========================================================================
-# 8. StreamTrainer
-# ===========================================================================
-
 class TestStreamTrainer:
 
     def test_fit_chunk_returns_dict_with_accuracy(self, stream_trainer, binary_data):
@@ -368,10 +328,6 @@ class TestStreamTrainer:
         assert 'memory_mb' in record
         assert record['memory_mb'] >= 0.0
 
-
-# ===========================================================================
-# 9. Integration — Pipeline + Metrics
-# ===========================================================================
 
 class TestIntegration:
 
