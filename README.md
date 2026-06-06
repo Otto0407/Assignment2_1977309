@@ -97,7 +97,7 @@ for Xc, yc in chunks:
 | `ensemble.py` | `EnsembleClassifier(method='bagging'/'random_forest')`, `RandomForestClassifier` |
 | `metrics.py` | Streaming: `Accuracy`, `F1Score`, `ConfusionMatrix`, `AUC` · Batch: `accuracy_score`, `f1_score`, `confusion_matrix`, `roc_auc_score` |
 | `pipeline.py` | `Pipeline(steps)` — supports `fit`, `partial_fit`, `predict`, `predict_proba`, `score` |
-| `stream.py` | `StreamTrainer(pipeline, metrics, log_memory)` — `fit_chunk`, `score_chunk`, `get_log`, `reset` |
+| `stream.py` | `StreamTrainer(pipeline, metrics)` — `fit_chunk`, `score_chunk`, `get_log`, `reset` |
 | `visualise.py` | `plot_metric_over_time`, `compare_models`, `plot_predictions_vs_ground_truth`, `plot_confusion_matrix` |
 
 All preprocessing transformers and estimators expose `partial_fit` for

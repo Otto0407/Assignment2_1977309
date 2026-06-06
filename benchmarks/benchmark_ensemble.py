@@ -46,25 +46,13 @@ def make_classification(
     return X, y
 
 
-def _get_rss_mb() -> float:
-    """Return current process RSS memory in MB (Linux /proc; fallback 0.0)."""
-    try:
-        with open('/proc/self/status') as f:
-            for line in f:
-                if line.startswith('VmRSS:'):
-                    return int(line.split()[1]) / 1024.0
-    except Exception:
-        pass
-    return 0.0
-
-
 def benchmark(clf, X_chunks, y_chunks, classes, name) -> list:
     """
     Stream chunks through clf and record per-chunk metrics.
 
     Returns
     -------
-    list of dict with keys: 'chunk', 'fit_ms', 'accuracy', 'memory_mb'
+    list of dict with keys: 'chunk', 'fit_ms', 'accuracy'
     """
     records = []
     for i, (Xc, yc) in enumerate(zip(X_chunks, y_chunks)):
@@ -73,24 +61,22 @@ def benchmark(clf, X_chunks, y_chunks, classes, name) -> list:
         fit_ms = (time.perf_counter() - t0) * 1000.0
 
         acc = accuracy_score(yc, clf.predict(Xc))
-        mem = _get_rss_mb()
-        records.append({'chunk': i, 'fit_ms': fit_ms, 'accuracy': acc, 'memory_mb': mem})
+        records.append({'chunk': i, 'fit_ms': fit_ms, 'accuracy': acc})
     return records
 
 
 def print_table(records, model_name) -> None:
-    header = f"{'Chunk':>6} {'Fit (ms)':>10} {'Accuracy':>10} {'RSS (MB)':>10}"
+    header = f"{'Chunk':>6} {'Fit (ms)':>10} {'Accuracy':>10}"
     sep = '-' * len(header)
     print(f"\n=== {model_name} ===")
     print(header)
     print(sep)
     for r in records:
-        print(f"{r['chunk']:>6} {r['fit_ms']:>10.2f} {r['accuracy']:>10.4f} {r['memory_mb']:>10.1f}")
-    avg_ms  = np.mean([r['fit_ms']     for r in records])
-    avg_acc = np.mean([r['accuracy']   for r in records])
-    avg_mem = np.mean([r['memory_mb']  for r in records])
+        print(f"{r['chunk']:>6} {r['fit_ms']:>10.2f} {r['accuracy']:>10.4f}")
+    avg_ms  = np.mean([r['fit_ms']   for r in records])
+    avg_acc = np.mean([r['accuracy'] for r in records])
     print(sep)
-    print(f"{'AVG':>6} {avg_ms:>10.2f} {avg_acc:>10.4f} {avg_mem:>10.1f}")
+    print(f"{'AVG':>6} {avg_ms:>10.2f} {avg_acc:>10.4f}")
 
 
 # ---------------------------------------------------------------------------
@@ -147,22 +133,20 @@ def main():
         (f'RandomForestClassifier        (n={N_ESTIMATORS})', rf_rec),
     ]
 
-    print("\n" + "=" * 72)
+    print("\n" + "=" * 62)
     print("HEAD-TO-HEAD SUMMARY")
-    print("=" * 72)
-    print(f"{'Model':<46} {'Avg Acc':>8} {'Avg ms':>8} {'Avg MB':>8}")
-    print('-' * 72)
+    print("=" * 62)
+    print(f"{'Model':<46} {'Avg Acc':>8} {'Avg ms':>8}")
+    print('-' * 62)
     for name, rec in models:
         print(f"{name:<46} {_avg(rec,'accuracy'):>8.4f} "
-              f"{_avg(rec,'fit_ms'):>8.1f} {_avg(rec,'memory_mb'):>8.1f}")
+              f"{_avg(rec,'fit_ms'):>8.1f}")
 
     print()
-    best_acc   = max(models, key=lambda m: _avg(m[1], 'accuracy'))
-    fastest    = min(models, key=lambda m: _avg(m[1], 'fit_ms'))
-    lowest_mem = min(models, key=lambda m: _avg(m[1], 'memory_mb'))
+    best_acc = max(models, key=lambda m: _avg(m[1], 'accuracy'))
+    fastest  = min(models, key=lambda m: _avg(m[1], 'fit_ms'))
     print(f"  Highest accuracy : {best_acc[0].strip()}")
     print(f"  Fastest fit      : {fastest[0].strip()}")
-    print(f"  Lowest memory    : {lowest_mem[0].strip()}")
 
     # Accuracy gain of best ensemble over base
     dt_acc  = _avg(dt_rec,  'accuracy')

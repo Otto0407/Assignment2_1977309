@@ -44,7 +44,7 @@ def rf_pipeline():
 
 @pytest.fixture
 def stream_trainer(rf_pipeline):
-    return StreamTrainer(rf_pipeline, metrics=[Accuracy()], log_memory=True)
+    return StreamTrainer(rf_pipeline, metrics=[Accuracy()])
 
 
 class TestStandardScaler:
@@ -321,13 +321,6 @@ class TestStreamTrainer:
         stream_trainer.fit_chunk(X, y)
         stream_trainer.reset()
         assert len(stream_trainer.get_log()) == 0
-
-    def test_memory_logged_when_requested(self, stream_trainer, binary_data):
-        X, y = binary_data
-        record = stream_trainer.fit_chunk(X, y)
-        assert 'memory_mb' in record
-        assert record['memory_mb'] >= 0.0
-
 
 class TestIntegration:
 
