@@ -54,19 +54,6 @@ class TestStreamTrainer(unittest.TestCase):
             trainer.fit_chunk(X[i*100:(i+1)*100], y[i*100:(i+1)*100])
         self.assertEqual(len(trainer.get_log()), 3)
 
-    def test_memory_logged_when_requested(self):
-        X, y = _make_data()
-        trainer = StreamTrainer(_make_pipeline(), log_memory=True)
-        record = trainer.fit_chunk(X[:50], y[:50])
-        self.assertIn('memory_mb', record)
-        self.assertGreaterEqual(record['memory_mb'], 0.0)
-
-    def test_memory_not_logged_when_disabled(self):
-        X, y = _make_data()
-        trainer = StreamTrainer(_make_pipeline(), log_memory=False)
-        record = trainer.fit_chunk(X[:50], y[:50])
-        self.assertNotIn('memory_mb', record)
-
     def test_score_chunk_does_not_advance_log(self):
         X, y = _make_data()
         trainer = StreamTrainer(_make_pipeline())

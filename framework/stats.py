@@ -256,23 +256,3 @@ class StreamStats:
         var[enough] = self._M2[enough] / self._count[enough]
         return var
 
-    def std(self) -> np.ndarray:
-        """
-        Return the current running population standard deviation per feature.
-
-        Returns
-        -------
-        np.ndarray, shape (n_features,)
-        """
-        return np.sqrt(self.variance())
-
-    @property
-    def n_samples_seen(self) -> np.ndarray:
-        """
-        Per-feature sample count (excludes NaN observations).
-
-        Returns
-        -------
-        np.ndarray, shape (n_features,), dtype int64
-        """
-        return self._count.copy()

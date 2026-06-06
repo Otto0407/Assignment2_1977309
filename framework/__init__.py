@@ -70,7 +70,6 @@ from framework.visualise import (
     plot_metric_over_time,
     compare_models,
     plot_predictions_vs_ground_truth,
-    plot_confusion_matrix,
 )
 
 # I/O
@@ -78,7 +77,6 @@ from framework.io import (
     load_csv,
     save_csv,
     stream_csv,
-    train_test_split,
     split_into_chunks,
 )
 
@@ -124,11 +122,9 @@ __all__ = [
     "plot_metric_over_time",
     "compare_models",
     "plot_predictions_vs_ground_truth",
-    "plot_confusion_matrix",
     # io
     "load_csv",
     "save_csv",
     "stream_csv",
-    "train_test_split",
     "split_into_chunks",
 ]

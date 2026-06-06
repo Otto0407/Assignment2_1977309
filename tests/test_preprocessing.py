@@ -68,19 +68,6 @@ class TestStandardScaler(unittest.TestCase):
         Xt = sc.transform(X)
         np.testing.assert_allclose(Xt.var(axis=0), np.ones(4), atol=1e-6)
 
-    def test_fit_transform_equivalent(self):
-        X = self._make(seed=1)
-        ref = StandardScaler().fit_transform(X)
-        sc = StandardScaler()
-        sc.partial_fit(X)
-        np.testing.assert_allclose(sc.transform(X), ref, rtol=1e-10)
-
-    def test_inverse_transform_roundtrip(self):
-        X = self._make(seed=2)
-        sc = StandardScaler()
-        sc.partial_fit(X)
-        np.testing.assert_allclose(sc.inverse_transform(sc.transform(X)), X, atol=1e-8)
-
     def test_incremental_chan_equals_batch(self):
         """Two partial_fit calls (Chan) must yield the same result as one batch call."""
         X = self._make(seed=3, n=200)
@@ -120,10 +107,6 @@ class TestStandardScaler(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             StandardScaler().transform(np.ones((5, 2)))
 
-    def test_inverse_before_fit_raises(self):
-        with self.assertRaises(RuntimeError):
-            StandardScaler().inverse_transform(np.ones((5, 2)))
-
     def test_large_magnitude_stability(self):
         """Chan's algorithm must remain stable for loc=1e10."""
         rng = np.random.default_rng(6)
@@ -158,11 +141,6 @@ class TestStandardScaler(unittest.TestCase):
         self.assertTrue(np.isnan(Xt[0, 0]))
         self.assertFalse(np.isnan(Xt[0, 1]))
 
-    def test_fit_transform_returns_correct_shape(self):
-        X = np.random.default_rng(7).normal(size=(50, 3))
-        Xt = StandardScaler().fit_transform(X)
-        self.assertEqual(Xt.shape, X.shape)
-
 
 # ---------------------------------------------------------------------------
 # MinMaxScaler
@@ -183,12 +161,6 @@ class TestMinMaxScaler(unittest.TestCase):
         sc = MinMaxScaler(feature_range=(-1, 1))
         sc.partial_fit(X)
         np.testing.assert_allclose(sc.transform(X).ravel(), [-1.0, 1.0])
-
-    def test_inverse_roundtrip(self):
-        X = np.random.default_rng(0).uniform(0, 100, (50, 3))
-        sc = MinMaxScaler()
-        sc.partial_fit(X)
-        np.testing.assert_allclose(sc.inverse_transform(sc.transform(X)), X, atol=1e-8)
 
     def test_incremental_minmax(self):
         """Min/max must track across two chunks correctly."""
@@ -216,10 +188,6 @@ class TestMinMaxScaler(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             MinMaxScaler().transform(np.ones((3, 2)))
 
-    def test_inverse_before_fit_raises(self):
-        with self.assertRaises(RuntimeError):
-            MinMaxScaler().inverse_transform(np.ones((3, 2)))
-
     def test_all_nan_column_then_valid(self):
         """all-NaN column on first chunk must not cause NaN state after valid data arrives."""
         sc = MinMaxScaler()
@@ -230,11 +198,6 @@ class TestMinMaxScaler(unittest.TestCase):
         self.assertFalse(np.any(np.isnan(sc._data_min)))
         self.assertFalse(np.any(np.isinf(sc._data_min)))
 
-    def test_fit_transform(self):
-        X = np.array([[0.0, 10.0], [5.0, 20.0], [10.0, 30.0]])
-        Xt = MinMaxScaler().fit_transform(X)
-        np.testing.assert_allclose(Xt.min(axis=0), [0.0, 0.0])
-        np.testing.assert_allclose(Xt.max(axis=0), [1.0, 1.0])
 
 
 # ---------------------------------------------------------------------------
@@ -352,13 +315,6 @@ class TestImputer(unittest.TestCase):
         self.assertAlmostEqual(Xt[0, 1], 5.0)   # was not NaN
         self.assertAlmostEqual(Xt[1, 0], 1.0)   # was not NaN
 
-    def test_fit_transform(self):
-        X = np.array([[1.0, np.nan], [3.0, 4.0], [5.0, np.nan]])
-        imp = Imputer(strategy='mean')
-        Xt = imp.fit_transform(X)
-        self.assertFalse(np.any(np.isnan(Xt)))
-        self.assertEqual(Xt.shape, X.shape)
-
 
 # ---------------------------------------------------------------------------
 # OneHotEncoder
@@ -397,19 +353,6 @@ class TestOneHotEncoder(unittest.TestCase):
         Xt = enc.transform(np.array([['a'], ['b'], ['c']]))
         self.assertEqual(Xt.shape[1], 3)           # 3 categories total
         np.testing.assert_array_equal(Xt.sum(axis=1), [1, 1, 1])
-
-    def test_feature_names_format(self):
-        X = np.array([['cat', '1'], ['dog', '2']])
-        enc = OneHotEncoder()
-        enc.partial_fit(X)
-        names = enc.get_feature_names()
-        self.assertIn('x0_cat', names)
-        self.assertIn('x0_dog', names)
-        self.assertIn('x1_1', names)
-        self.assertIn('x1_2', names)
-
-    def test_feature_names_empty_before_fit(self):
-        self.assertEqual(OneHotEncoder().get_feature_names(), [])
 
     def test_unknown_category_is_all_zero(self):
         """A category not seen during fit must produce an all-zero row."""

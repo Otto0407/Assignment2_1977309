@@ -150,45 +150,6 @@ def stream_csv(
 
 
 # ---------------------------------------------------------------------------
-# Train/test split
-# ---------------------------------------------------------------------------
-
-def train_test_split(
-    X: np.ndarray,
-    y: np.ndarray,
-    test_size: float = 0.2,
-    shuffle: bool = True,
-    random_state: int = None,
-) -> tuple:
-    """
-    Split arrays into training and test subsets.
-
-    Parameters
-    ----------
-    X           : np.ndarray, shape (n, d)
-    y           : np.ndarray, shape (n,)
-    test_size   : float in (0, 1), fraction of samples for the test set
-    shuffle     : bool – shuffle before splitting
-    random_state : int or None
-
-    Returns
-    -------
-    (X_train, X_test, y_train, y_test) : tuple of np.ndarray
-    """
-    X = np.asarray(X)
-    y = np.asarray(y)
-    n = X.shape[0]
-    indices = np.arange(n)
-    if shuffle:
-        rng = np.random.default_rng(random_state)
-        rng.shuffle(indices)
-    n_test = max(1, int(np.floor(n * test_size)))
-    test_idx = indices[:n_test]
-    train_idx = indices[n_test:]
-    return X[train_idx], X[test_idx], y[train_idx], y[test_idx]
-
-
-# ---------------------------------------------------------------------------
 # Chunk splitter
 # ---------------------------------------------------------------------------
 

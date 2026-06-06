@@ -22,7 +22,7 @@ OneHotEncoder.transform
     The inner "loop over categories" is replaced by broadcasting
     X[:, j] (n,1) == cats (1, C) to produce the full block at once.
 
-OneHotEncoder.partial_fit / get_feature_names
+OneHotEncoder.partial_fit
     Retain a Python loop over features because each feature has a
     variable-length category list; numpy cannot unify these into a
     single rectangular operation.
@@ -163,26 +163,6 @@ class StandardScaler:
             raise RuntimeError("Call partial_fit before transform.")
         return (np.asarray(X, dtype=float) - self._mean) / self._std()
 
-    def fit_transform(self, X: np.ndarray) -> np.ndarray:
-        """Fit on X then transform X. X : (n, d) -> (n, d)."""
-        return self.partial_fit(X).transform(X)
-
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
-        """
-        Reverse the standardisation.
-
-        Parameters
-        ----------
-        X : np.ndarray, shape (n, d)
-
-        Returns
-        -------
-        np.ndarray, shape (n, d)
-        """
-        if self._mean is None:
-            raise RuntimeError("Call partial_fit before inverse_transform.")
-        return np.asarray(X, dtype=float) * self._std() + self._mean
-
 
 # ---------------------------------------------------------------------------
 # MinMaxScaler
@@ -260,30 +240,6 @@ class MinMaxScaler:
         scale = np.where(scale == 0, 1.0, scale)
         lo, hi = self.feature_range
         return (X - self._data_min) / scale * (hi - lo) + lo
-
-    def fit_transform(self, X: np.ndarray) -> np.ndarray:
-        """Fit on X then transform X. X : (n, d) -> (n, d)."""
-        return self.partial_fit(X).transform(X)
-
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
-        """
-        Reverse the min-max scaling.
-
-        Parameters
-        ----------
-        X : np.ndarray, shape (n, d)
-
-        Returns
-        -------
-        np.ndarray, shape (n, d)
-        """
-        if self._data_min is None:
-            raise RuntimeError("Call partial_fit before inverse_transform.")
-        X = np.asarray(X, dtype=float)
-        lo, hi = self.feature_range
-        scale = self._data_max - self._data_min
-        scale = np.where(scale == 0, 1.0, scale)
-        return (X - lo) / (hi - lo) * scale + self._data_min
 
 
 # ---------------------------------------------------------------------------
@@ -375,10 +331,6 @@ class Imputer:
             self._statistics = np.full(d, self.fill_value, dtype=float)
 
         return self
-
-    def fit_transform(self, X: np.ndarray) -> np.ndarray:
-        """Fit on X then transform X. X : (n, d) -> (n, d)."""
-        return self.partial_fit(X).transform(X)
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -474,18 +426,3 @@ class OneHotEncoder:
             blocks.append(block)
         return np.concatenate(blocks, axis=1)
 
-    def get_feature_names(self) -> list:
-        """
-        Return feature names for the one-hot encoded columns.
-
-        Returns
-        -------
-        list of str – names in the form 'x{feature_idx}_{category}'
-        """
-        if self.categories_ is None:
-            return []
-        return [
-            f"x{j}_{cat}"
-            for j, cats in enumerate(self.categories_)
-            for cat in cats
-        ]

@@ -10,7 +10,7 @@ Covers:
   - chunk_histogram: shapes, counts sum, zero-range, NaN exclusion, range_
   - StreamStats: incremental == batch, NaN per-feature isolation,
     reset, wrong shape, count==1 variance, large-magnitude stability,
-    n_samples_seen, std, multi-chunk precision
+    multi-chunk precision
 """
 
 import unittest
@@ -273,12 +273,6 @@ class TestStreamStats(unittest.TestCase):
 
     # --- std ---
 
-    def test_std_is_sqrt_variance(self):
-        X = self._make_data()
-        ss = StreamStats(n_features=4)
-        ss.update(X)
-        np.testing.assert_allclose(ss.std(), np.sqrt(ss.variance()))
-
     # --- incremental == batch ---
 
     def test_incremental_equals_batch(self):
@@ -331,7 +325,7 @@ class TestStreamStats(unittest.TestCase):
         # After reset, no samples seen → mean is NaN (count=0), variance is 0
         self.assertTrue(np.all(np.isnan(ss.mean())))
         np.testing.assert_allclose(ss.variance(), np.zeros(4))
-        np.testing.assert_array_equal(ss.n_samples_seen, np.zeros(4, dtype=int))
+        np.testing.assert_array_equal(ss._count, np.zeros(4, dtype=int))
 
     def test_update_after_reset(self):
         ss = StreamStats(n_features=2)
@@ -346,19 +340,6 @@ class TestStreamStats(unittest.TestCase):
         ss = StreamStats(n_features=3)
         with self.assertRaises(ValueError):
             ss.update(np.ones((5, 4)))
-
-    # --- n_samples_seen ---
-
-    def test_n_samples_seen_no_nan(self):
-        ss = StreamStats(n_features=2)
-        ss.update(np.ones((7, 2)))
-        np.testing.assert_array_equal(ss.n_samples_seen, [7, 7])
-
-    def test_n_samples_seen_with_nan(self):
-        X = np.array([[1.0, np.nan], [2.0, 3.0], [4.0, 5.0]])
-        ss = StreamStats(n_features=2)
-        ss.update(X)
-        np.testing.assert_array_equal(ss.n_samples_seen, [3, 2])
 
     # --- numerical stability ---
 

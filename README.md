@@ -34,7 +34,7 @@ Assignment2_1977309/
 │   ├── pipeline.py        # Pipeline (chains transformers + estimator)
 │   ├── stream.py          # StreamTrainer (orchestrates pipeline + logging)
 │   ├── visualise.py       # matplotlib plotting helpers
-│   └── io.py              # load_csv, save_csv, stream_csv, train_test_split, split_into_chunks
+│   └── io.py              # load_csv, save_csv, stream_csv, split_into_chunks
 ├── tests/                 # per-module unittest suites (307 tests)
 │   ├── test_stats.py
 │   ├── test_preprocessing.py
@@ -90,7 +90,7 @@ for Xc, yc in chunks:
 
 | Module | Key classes / functions |
 |---|---|
-| `io.py` | `load_csv`, `save_csv`, `stream_csv`, `train_test_split`, `split_into_chunks` |
+| `io.py` | `load_csv`, `save_csv`, `stream_csv`, `split_into_chunks` |
 | `stats.py` | `StreamStats`, `chunk_mean`, `chunk_variance`, `chunk_quantile`, `chunk_histogram` |
 | `preprocessing.py` | `StandardScaler`, `MinMaxScaler`, `Imputer(strategy)`, `OneHotEncoder` |
 | `tree.py` | `DecisionTreeClassifier(max_depth, criterion, max_features)` |
@@ -98,7 +98,7 @@ for Xc, yc in chunks:
 | `metrics.py` | Streaming: `Accuracy`, `F1Score`, `ConfusionMatrix`, `AUC` · Batch: `accuracy_score`, `f1_score`, `confusion_matrix`, `roc_auc_score` |
 | `pipeline.py` | `Pipeline(steps)` — supports `fit`, `partial_fit`, `predict`, `predict_proba`, `score` |
 | `stream.py` | `StreamTrainer(pipeline, metrics)` — `fit_chunk`, `score_chunk`, `get_log`, `reset` |
-| `visualise.py` | `plot_metric_over_time`, `compare_models`, `plot_predictions_vs_ground_truth`, `plot_confusion_matrix` |
+| `visualise.py` | `plot_metric_over_time`, `compare_models`, `plot_predictions_vs_ground_truth` |
 
 All preprocessing transformers and estimators expose `partial_fit` for
 incremental learning and accept `NaN` values where noted.

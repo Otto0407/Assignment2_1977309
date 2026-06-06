@@ -87,12 +87,6 @@ class TestMinMaxScaler:
         assert Xt.min() >= 0.0
         assert Xt.max() <= 1.0
 
-    def test_inverse_roundtrip(self):
-        rng = np.random.default_rng(1)
-        X = rng.normal(size=(50, 2))
-        sc = MinMaxScaler().partial_fit(X)
-        np.testing.assert_allclose(sc.inverse_transform(sc.transform(X)), X, atol=1e-10)
-
 
 class TestImputer:
 
