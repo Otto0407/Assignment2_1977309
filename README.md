@@ -35,19 +35,8 @@ Assignment2_1977309/
 │   ├── stream.py          # StreamTrainer (orchestrates pipeline + logging)
 │   ├── visualise.py       # matplotlib plotting helpers
 │   └── io.py              # load_csv, save_csv, stream_csv, split_into_chunks
-├── tests/                 # per-module unittest suites (307 tests)
-│   ├── test_stats.py
-│   ├── test_preprocessing.py
-│   ├── test_tree.py
-│   ├── test_ensemble.py
-│   ├── test_metrics.py
-│   ├── test_pipeline.py
-│   ├── test_stream.py
-│   ├── test_integration_pipeline_metrics.py
-│   └── test_visualise.py
-├── tests.py               # curated pytest suite (41 tests)
-├── conftest.py            # pytest configuration
-├── pytest.ini
+├── tests/
+│   └── test_curated.py    # curated pytest suite (39 tests)
 ├── demo/
 │   └── stream_demo.ipynb  # end-to-end streaming demo
 ├── benchmarks/
@@ -105,16 +94,8 @@ incremental learning and accept `NaN` values where noted.
 
 ## Running the tests
 
-**Curated pytest suite (recommended):**
-
 ```bash
-pytest tests.py -v
-```
-
-**Full per-module unittest suite:**
-
-```bash
-python -m unittest discover tests/
+pytest tests/test_curated.py -v
 ```
 
 ## Running the demo
